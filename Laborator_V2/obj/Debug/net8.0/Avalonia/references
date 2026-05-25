@@ -1,4 +1,5 @@
 /Users/mirceapop/.nuget/packages/avalonia/12.0.3/ref/net8.0/Avalonia.Base.dll
+/Users/mirceapop/.nuget/packages/avalonia.controls.datagrid/12.0.0/lib/net8.0/Avalonia.Controls.DataGrid.dll
 /Users/mirceapop/.nuget/packages/avalonia/12.0.3/ref/net8.0/Avalonia.Controls.dll
 /Users/mirceapop/.nuget/packages/avalonia/12.0.3/ref/net8.0/Avalonia.DesignerSupport.dll
 /Users/mirceapop/.nuget/packages/avalonia.desktop/12.0.3/lib/net8.0/Avalonia.Desktop.dll
@@ -27,8 +28,21 @@
 /Users/mirceapop/.nuget/packages/microsoft.data.sqlclient/7.1.0-preview1.26124.5/ref/net8.0/Microsoft.Data.SqlClient.dll
 /Users/mirceapop/.nuget/packages/microsoft.data.sqlclient.extensions.abstractions/1.0.0/lib/netstandard2.0/Microsoft.Data.SqlClient.Extensions.Abstractions.dll
 /Users/mirceapop/.nuget/packages/microsoft.data.sqlclient.internal.logging/1.0.0/lib/netstandard2.0/Microsoft.Data.SqlClient.Internal.Logging.dll
+/Users/mirceapop/.nuget/packages/microsoft.data.sqlite.core/8.0.0/lib/net8.0/Microsoft.Data.Sqlite.dll
+/Users/mirceapop/.nuget/packages/microsoft.entityframeworkcore.abstractions/8.0.0/lib/net8.0/Microsoft.EntityFrameworkCore.Abstractions.dll
+/Users/mirceapop/.nuget/packages/microsoft.entityframeworkcore/8.0.0/lib/net8.0/Microsoft.EntityFrameworkCore.dll
+/Users/mirceapop/.nuget/packages/microsoft.entityframeworkcore.relational/8.0.0/lib/net8.0/Microsoft.EntityFrameworkCore.Relational.dll
+/Users/mirceapop/.nuget/packages/microsoft.entityframeworkcore.sqlite.core/8.0.0/lib/net8.0/Microsoft.EntityFrameworkCore.Sqlite.dll
+/Users/mirceapop/.nuget/packages/microsoft.extensions.caching.abstractions/8.0.0/lib/net8.0/Microsoft.Extensions.Caching.Abstractions.dll
+/Users/mirceapop/.nuget/packages/microsoft.extensions.caching.memory/8.0.1/lib/net8.0/Microsoft.Extensions.Caching.Memory.dll
+/Users/mirceapop/.nuget/packages/microsoft.extensions.configuration.abstractions/8.0.0/lib/net8.0/Microsoft.Extensions.Configuration.Abstractions.dll
 /Users/mirceapop/.nuget/packages/microsoft.extensions.dependencyinjection.abstractions/8.0.2/lib/net8.0/Microsoft.Extensions.DependencyInjection.Abstractions.dll
+/Users/mirceapop/.nuget/packages/microsoft.extensions.dependencyinjection/8.0.0/lib/net8.0/Microsoft.Extensions.DependencyInjection.dll
+/Users/mirceapop/.nuget/packages/microsoft.extensions.dependencymodel/8.0.0/lib/net8.0/Microsoft.Extensions.DependencyModel.dll
 /Users/mirceapop/.nuget/packages/microsoft.extensions.logging.abstractions/8.0.2/lib/net8.0/Microsoft.Extensions.Logging.Abstractions.dll
+/Users/mirceapop/.nuget/packages/microsoft.extensions.logging/8.0.0/lib/net8.0/Microsoft.Extensions.Logging.dll
+/Users/mirceapop/.nuget/packages/microsoft.extensions.options/8.0.2/lib/net8.0/Microsoft.Extensions.Options.dll
+/Users/mirceapop/.nuget/packages/microsoft.extensions.primitives/8.0.0/lib/net8.0/Microsoft.Extensions.Primitives.dll
 /Users/mirceapop/.nuget/packages/microsoft.identitymodel.abstractions/8.16.0/lib/net8.0/Microsoft.IdentityModel.Abstractions.dll
 /Users/mirceapop/.nuget/packages/microsoft.identitymodel.jsonwebtokens/8.16.0/lib/net8.0/Microsoft.IdentityModel.JsonWebTokens.dll
 /Users/mirceapop/.nuget/packages/microsoft.identitymodel.logging/8.16.0/lib/net8.0/Microsoft.IdentityModel.Logging.dll
@@ -43,6 +57,9 @@
 /Users/mirceapop/.dotnet/packs/Microsoft.NETCore.App.Ref/8.0.27/ref/net8.0/mscorlib.dll
 /Users/mirceapop/.dotnet/packs/Microsoft.NETCore.App.Ref/8.0.27/ref/net8.0/netstandard.dll
 /Users/mirceapop/.nuget/packages/skiasharp/3.119.4-preview.1.1/ref/net6.0/SkiaSharp.dll
+/Users/mirceapop/.nuget/packages/sqlitepclraw.bundle_e_sqlite3/2.1.6/lib/netstandard2.0/SQLitePCLRaw.batteries_v2.dll
+/Users/mirceapop/.nuget/packages/sqlitepclraw.core/2.1.6/lib/netstandard2.0/SQLitePCLRaw.core.dll
+/Users/mirceapop/.nuget/packages/sqlitepclraw.provider.e_sqlite3/2.1.6/lib/net6.0/SQLitePCLRaw.provider.e_sqlite3.dll
 /Users/mirceapop/.dotnet/packs/Microsoft.NETCore.App.Ref/8.0.27/ref/net8.0/System.AppContext.dll
 /Users/mirceapop/.dotnet/packs/Microsoft.NETCore.App.Ref/8.0.27/ref/net8.0/System.Buffers.dll
 /Users/mirceapop/.dotnet/packs/Microsoft.NETCore.App.Ref/8.0.27/ref/net8.0/System.Collections.Concurrent.dll
