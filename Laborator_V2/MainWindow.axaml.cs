@@ -21,8 +21,8 @@ public partial class MainWindow : Window
     private string _childFk = "";
 
     private DataSet _dataSet = new DataSet();
-    private DataRowView? _selectedParentRow = null;
-    private DataRowView? _selectedChildRow = null;
+    private Dictionary<string, object?>? _selectedParentRow = null;
+    private Dictionary<string, object?>? _selectedChildRow = null;
 
     // Dicționar pentru a păstra referințele către TextBox-urile generate dinamic
     private Dictionary<string, TextBox> _inputFields = new Dictionary<string, TextBox>();
@@ -55,26 +55,32 @@ public partial class MainWindow : Window
     private void EnsureDatabase()
     {
         var dbPath = new SqliteConnectionStringBuilder(_connStr).DataSource;
-        if (File.Exists(dbPath))
-            return;
-
-        if (!File.Exists(_initSqlPath))
-        {
-            StatusText.Text = "❌ Nu am găsit QueryTestDb.sql în folderul de rulare.";
-            return;
-        }
 
         using var conn = new SqliteConnection(_connStr);
         conn.Open();
         EnableForeignKeys(conn);
 
-        var sql = File.ReadAllText(_initSqlPath);
-        foreach (var statement in SplitSqlStatements(sql))
+        var hasTables = DatabaseHasTable(conn, _parentTable) && DatabaseHasTable(conn, _childTable);
+
+        if (!hasTables)
         {
-            using var cmd = conn.CreateCommand();
-            cmd.CommandText = statement;
-            cmd.ExecuteNonQuery();
+            if (File.Exists(_initSqlPath))
+            {
+                var sql = File.ReadAllText(_initSqlPath);
+                foreach (var statement in SplitSqlStatements(sql))
+                {
+                    using var cmd = conn.CreateCommand();
+                    cmd.CommandText = statement;
+                    cmd.ExecuteNonQuery();
+                }
+            }
+            else
+            {
+                CreateSchemaAndSeed(conn);
+            }
         }
+
+        EnsureSeedData(conn);
     }
 
     private static IEnumerable<string> SplitSqlStatements(string sql)
@@ -178,6 +184,16 @@ public partial class MainWindow : Window
         }
     }
 
+    private void ParentGrid_SelectionChanged(object? sender, SelectionChangedEventArgs e)
+    {
+        if (ParentGrid.SelectedItem is Dictionary<string, object?> row)
+        {
+            _selectedParentRow = row;
+            _selectedChildRow = null;
+            ReloadChildData();
+        }
+    }
+
     private DataTable EnsureTable(string tableName)
     {
         if (_dataSet.Tables.Contains(tableName))
@@ -199,7 +215,7 @@ public partial class MainWindow : Window
 
         try
         {
-            object parentPkValue = _selectedParentRow[_parentPk];
+            object parentPkValue = _selectedParentRow[_parentPk] ?? DBNull.Value;
 
             using var conn = new SqliteConnection(_connStr);
             conn.Open();
@@ -260,13 +276,13 @@ public partial class MainWindow : Window
 
     private void ChildGrid_SelectionChanged(object? sender, SelectionChangedEventArgs e)
     {
-        if (ChildGrid.SelectedItem is DataRowView rowView)
+        if (ChildGrid.SelectedItem is Dictionary<string, object?> row)
         {
-            _selectedChildRow = rowView;
+            _selectedChildRow = row;
             // Populăm textbox-urile cu datele rândului selectat pentru Update/Delete
             foreach (var kvp in _inputFields)
             {
-                kvp.Value.Text = rowView[kvp.Key]?.ToString() ?? "";
+                kvp.Value.Text = row.TryGetValue(kvp.Key, out var value) ? value?.ToString() ?? "" : "";
             }
         }
     }
@@ -348,7 +364,7 @@ public partial class MainWindow : Window
                 if (kvp.Key == _childPk || kvp.Key == _childFk) continue;
                 cmd.Parameters.AddWithValue("@" + kvp.Key, string.IsNullOrWhiteSpace(kvp.Value.Text) ? DBNull.Value : kvp.Value.Text);
             }
-            cmd.Parameters.AddWithValue("@childPkVal", _selectedChildRow[_childPk]);
+            cmd.Parameters.AddWithValue("@childPkVal", _selectedChildRow[_childPk] ?? DBNull.Value);
 
             cmd.ExecuteNonQuery();
             StatusText.Text = "✅ Înregistrare copil modificată cu succes!";
@@ -378,7 +394,7 @@ public partial class MainWindow : Window
             string query = $"DELETE FROM {_childTable} WHERE {_childPk} = @childPkVal";
             using var cmd = conn.CreateCommand();
             cmd.CommandText = query;
-            cmd.Parameters.AddWithValue("@childPkVal", _selectedChildRow[_childPk]);
+            cmd.Parameters.AddWithValue("@childPkVal", _selectedChildRow[_childPk] ?? DBNull.Value);
 
             cmd.ExecuteNonQuery();
             StatusText.Text = "✅ Înregistrare copil ștearsă cu succes!";
@@ -402,10 +418,71 @@ public partial class MainWindow : Window
             {
                 Header = col.ColumnName,
                 Width = new DataGridLength(1, DataGridLengthUnitType.Star),
-                Binding = new Avalonia.Data.Binding(col.ColumnName)
+                Binding = new Avalonia.Data.Binding($"[{col.ColumnName}]")
             });
         }
 
-        grid.ItemsSource = table.DefaultView;
+        grid.ItemsSource = ToRowDictionaries(table);
+    }
+
+    private static List<Dictionary<string, object?>> ToRowDictionaries(DataTable table)
+    {
+        var rows = new List<Dictionary<string, object?>>();
+        foreach (DataRow row in table.Rows)
+        {
+            var dict = new Dictionary<string, object?>();
+            foreach (DataColumn col in table.Columns)
+            {
+                var value = row[col];
+                dict[col.ColumnName] = value == DBNull.Value ? null : value;
+            }
+            rows.Add(dict);
+        }
+        return rows;
+    }
+
+    private static bool DatabaseHasTable(SqliteConnection conn, string tableName)
+    {
+        using var cmd = conn.CreateCommand();
+        cmd.CommandText = "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = @name;";
+        cmd.Parameters.AddWithValue("@name", tableName);
+        return cmd.ExecuteScalar() != null;
+    }
+
+    private static void CreateSchemaAndSeed(SqliteConnection conn)
+    {
+        using (var cmd = conn.CreateCommand())
+        {
+            cmd.CommandText = @"
+CREATE TABLE IF NOT EXISTS Parents (
+    ParentId INTEGER PRIMARY KEY,
+    Name TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS Children (
+    ChildId INTEGER PRIMARY KEY,
+    ParentId INTEGER NOT NULL,
+    Name TEXT NOT NULL,
+    FOREIGN KEY (ParentId) REFERENCES Parents(ParentId)
+);";
+            cmd.ExecuteNonQuery();
+        }
+
+        EnsureSeedData(conn);
+    }
+
+    private static void EnsureSeedData(SqliteConnection conn)
+    {
+        if (!DatabaseHasTable(conn, "Parents") || !DatabaseHasTable(conn, "Children"))
+            return;
+
+        using var cmd = conn.CreateCommand();
+        cmd.CommandText = @"
+INSERT OR IGNORE INTO Parents (ParentId, Name) VALUES (1, 'Parent 1');
+INSERT OR IGNORE INTO Parents (ParentId, Name) VALUES (2, 'Parent 2');
+
+INSERT OR IGNORE INTO Children (ChildId, ParentId, Name) VALUES (1, 1, 'Child A');
+INSERT OR IGNORE INTO Children (ChildId, ParentId, Name) VALUES (2, 1, 'Child B');";
+        cmd.ExecuteNonQuery();
     }
 }
