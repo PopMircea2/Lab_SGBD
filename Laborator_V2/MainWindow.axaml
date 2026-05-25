@@ -1,0 +1,9 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="Laborator_V2.MainWindow"
+        Title="Laborator SGBD"
+        Width="900" Height="600">
+    <StackPanel Margin="10">
+        <TextBlock Name="StatusText" Text="Connecting..." FontSize="16"/>
+    </StackPanel>
+</Window>

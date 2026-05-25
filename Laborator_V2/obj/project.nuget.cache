@@ -1,0 +1,83 @@
+{
+  "version": 2,
+  "dgSpecHash": "9P+5FD7yC5U=",
+  "success": true,
+  "projectFilePath": "/Users/mirceapop/RiderProjects/Laborator_V2/Laborator_V2/Laborator_V2.csproj",
+  "expectedPackageFiles": [
+    "/Users/mirceapop/.nuget/packages/avalonia/12.0.3/avalonia.12.0.3.nupkg.sha512",
+    "/Users/mirceapop/.nuget/packages/avalonia.angle.windows.natives/2.1.25547.20250602/avalonia.angle.windows.natives.2.1.25547.20250602.nupkg.sha512",
+    "/Users/mirceapop/.nuget/packages/avalonia.buildservices/11.3.2/avalonia.buildservices.11.3.2.nupkg.sha512",
+    "/Users/mirceapop/.nuget/packages/avalonia.desktop/12.0.3/avalonia.desktop.12.0.3.nupkg.sha512",
+    "/Users/mirceapop/.nuget/packages/avalonia.freedesktop/12.0.3/avalonia.freedesktop.12.0.3.nupkg.sha512",
+    "/Users/mirceapop/.nuget/packages/avalonia.freedesktop.atspi/12.0.3/avalonia.freedesktop.atspi.12.0.3.nupkg.sha512",
+    "/Users/mirceapop/.nuget/packages/avalonia.harfbuzz/12.0.3/avalonia.harfbuzz.12.0.3.nupkg.sha512",
+    "/Users/mirceapop/.nuget/packages/avalonia.native/12.0.3/avalonia.native.12.0.3.nupkg.sha512",
+    "/Users/mirceapop/.nuget/packages/avalonia.remote.protocol/12.0.3/avalonia.remote.protocol.12.0.3.nupkg.sha512",
+    "/Users/mirceapop/.nuget/packages/avalonia.skia/12.0.3/avalonia.skia.12.0.3.nupkg.sha512",
+    "/Users/mirceapop/.nuget/packages/avalonia.themes.fluent/12.0.3/avalonia.themes.fluent.12.0.3.nupkg.sha512",
+    "/Users/mirceapop/.nuget/packages/avalonia.win32/12.0.3/avalonia.win32.12.0.3.nupkg.sha512",
+    "/Users/mirceapop/.nuget/packages/avalonia.x11/12.0.3/avalonia.x11.12.0.3.nupkg.sha512",
+    "/Users/mirceapop/.nuget/packages/harfbuzzsharp/8.3.1.3/harfbuzzsharp.8.3.1.3.nupkg.sha512",
+    "/Users/mirceapop/.nuget/packages/harfbuzzsharp.nativeassets.linux/8.3.1.3/harfbuzzsharp.nativeassets.linux.8.3.1.3.nupkg.sha512",
+    "/Users/mirceapop/.nuget/packages/harfbuzzsharp.nativeassets.macos/8.3.1.3/harfbuzzsharp.nativeassets.macos.8.3.1.3.nupkg.sha512",
+    "/Users/mirceapop/.nuget/packages/harfbuzzsharp.nativeassets.webassembly/8.3.1.3/harfbuzzsharp.nativeassets.webassembly.8.3.1.3.nupkg.sha512",
+    "/Users/mirceapop/.nuget/packages/harfbuzzsharp.nativeassets.win32/8.3.1.3/harfbuzzsharp.nativeassets.win32.8.3.1.3.nupkg.sha512",
+    "/Users/mirceapop/.nuget/packages/microcom.runtime/0.11.4/microcom.runtime.0.11.4.nupkg.sha512",
+    "/Users/mirceapop/.nuget/packages/microsoft.bcl.cryptography/8.0.0/microsoft.bcl.cryptography.8.0.0.nupkg.sha512",
+    "/Users/mirceapop/.nuget/packages/microsoft.data.sqlclient/7.1.0-preview1.26124.5/microsoft.data.sqlclient.7.1.0-preview1.26124.5.nupkg.sha512",
+    "/Users/mirceapop/.nuget/packages/microsoft.data.sqlclient.extensions.abstractions/1.0.0/microsoft.data.sqlclient.extensions.abstractions.1.0.0.nupkg.sha512",
+    "/Users/mirceapop/.nuget/packages/microsoft.data.sqlclient.internal.logging/1.0.0/microsoft.data.sqlclient.internal.logging.1.0.0.nupkg.sha512",
+    "/Users/mirceapop/.nuget/packages/microsoft.data.sqlclient.sni.runtime/6.0.2/microsoft.data.sqlclient.sni.runtime.6.0.2.nupkg.sha512",
+    "/Users/mirceapop/.nuget/packages/microsoft.extensions.caching.abstractions/8.0.0/microsoft.extensions.caching.abstractions.8.0.0.nupkg.sha512",
+    "/Users/mirceapop/.nuget/packages/microsoft.extensions.caching.memory/8.0.1/microsoft.extensions.caching.memory.8.0.1.nupkg.sha512",
+    "/Users/mirceapop/.nuget/packages/microsoft.extensions.dependencyinjection.abstractions/8.0.2/microsoft.extensions.dependencyinjection.abstractions.8.0.2.nupkg.sha512",
+    "/Users/mirceapop/.nuget/packages/microsoft.extensions.logging.abstractions/8.0.2/microsoft.extensions.logging.abstractions.8.0.2.nupkg.sha512",
+    "/Users/mirceapop/.nuget/packages/microsoft.extensions.options/8.0.2/microsoft.extensions.options.8.0.2.nupkg.sha512",
+    "/Users/mirceapop/.nuget/packages/microsoft.extensions.primitives/8.0.0/microsoft.extensions.primitives.8.0.0.nupkg.sha512",
+    "/Users/mirceapop/.nuget/packages/microsoft.identitymodel.abstractions/8.16.0/microsoft.identitymodel.abstractions.8.16.0.nupkg.sha512",
+    "/Users/mirceapop/.nuget/packages/microsoft.identitymodel.jsonwebtokens/8.16.0/microsoft.identitymodel.jsonwebtokens.8.16.0.nupkg.sha512",
+    "/Users/mirceapop/.nuget/packages/microsoft.identitymodel.logging/8.16.0/microsoft.identitymodel.logging.8.16.0.nupkg.sha512",
+    "/Users/mirceapop/.nuget/packages/microsoft.identitymodel.protocols/8.16.0/microsoft.identitymodel.protocols.8.16.0.nupkg.sha512",
+    "/Users/mirceapop/.nuget/packages/microsoft.identitymodel.protocols.openidconnect/8.16.0/microsoft.identitymodel.protocols.openidconnect.8.16.0.nupkg.sha512",
+    "/Users/mirceapop/.nuget/packages/microsoft.identitymodel.tokens/8.16.0/microsoft.identitymodel.tokens.8.16.0.nupkg.sha512",
+    "/Users/mirceapop/.nuget/packages/microsoft.sqlserver.server/1.0.0/microsoft.sqlserver.server.1.0.0.nupkg.sha512",
+    "/Users/mirceapop/.nuget/packages/skiasharp/3.119.4-preview.1.1/skiasharp.3.119.4-preview.1.1.nupkg.sha512",
+    "/Users/mirceapop/.nuget/packages/skiasharp.nativeassets.linux/3.119.4-preview.1.1/skiasharp.nativeassets.linux.3.119.4-preview.1.1.nupkg.sha512",
+    "/Users/mirceapop/.nuget/packages/skiasharp.nativeassets.macos/3.119.4-preview.1.1/skiasharp.nativeassets.macos.3.119.4-preview.1.1.nupkg.sha512",
+    "/Users/mirceapop/.nuget/packages/skiasharp.nativeassets.webassembly/3.119.4-preview.1.1/skiasharp.nativeassets.webassembly.3.119.4-preview.1.1.nupkg.sha512",
+    "/Users/mirceapop/.nuget/packages/skiasharp.nativeassets.win32/3.119.4-preview.1.1/skiasharp.nativeassets.win32.3.119.4-preview.1.1.nupkg.sha512",
+    "/Users/mirceapop/.nuget/packages/system.configuration.configurationmanager/11.0.0-preview.4.26230.115/system.configuration.configurationmanager.11.0.0-preview.4.26230.115.nupkg.sha512",
+    "/Users/mirceapop/.nuget/packages/system.identitymodel.tokens.jwt/8.16.0/system.identitymodel.tokens.jwt.8.16.0.nupkg.sha512",
+    "/Users/mirceapop/.nuget/packages/system.io.pipelines/8.0.0/system.io.pipelines.8.0.0.nupkg.sha512",
+    "/Users/mirceapop/.nuget/packages/system.memory/4.6.3/system.memory.4.6.3.nupkg.sha512",
+    "/Users/mirceapop/.nuget/packages/system.security.cryptography.pkcs/8.0.1/system.security.cryptography.pkcs.8.0.1.nupkg.sha512",
+    "/Users/mirceapop/.nuget/packages/system.security.cryptography.protecteddata/11.0.0-preview.4.26230.115/system.security.cryptography.protecteddata.11.0.0-preview.4.26230.115.nupkg.sha512",
+    "/Users/mirceapop/.nuget/packages/tmds.dbus.protocol/0.92.0/tmds.dbus.protocol.0.92.0.nupkg.sha512"
+  ],
+  "logs": [
+    {
+      "code": "NU1603",
+      "level": "Warning",
+      "message": "Microsoft.Data.SqlClient 7.1.0-preview1.26124.5 depends on Microsoft.Data.SqlClient.Extensions.Abstractions (>= 1.0.0-preview1.26124.5) but Microsoft.Data.SqlClient.Extensions.Abstractions 1.0.0-preview1.26124.5 was not found. Microsoft.Data.SqlClient.Extensions.Abstractions 1.0.0 was resolved instead.",
+      "projectPath": "/Users/mirceapop/RiderProjects/Laborator_V2/Laborator_V2/Laborator_V2.csproj",
+      "warningLevel": 1,
+      "filePath": "/Users/mirceapop/RiderProjects/Laborator_V2/Laborator_V2/Laborator_V2.csproj",
+      "libraryId": "Microsoft.Data.SqlClient.Extensions.Abstractions",
+      "targetGraphs": [
+        "net8.0"
+      ]
+    },
+    {
+      "code": "NU1603",
+      "level": "Warning",
+      "message": "Microsoft.Data.SqlClient 7.1.0-preview1.26124.5 depends on Microsoft.Data.SqlClient.Internal.Logging (>= 1.0.0-preview1.26124.5) but Microsoft.Data.SqlClient.Internal.Logging 1.0.0-preview1.26124.5 was not found. Microsoft.Data.SqlClient.Internal.Logging 1.0.0 was resolved instead.",
+      "projectPath": "/Users/mirceapop/RiderProjects/Laborator_V2/Laborator_V2/Laborator_V2.csproj",
+      "warningLevel": 1,
+      "filePath": "/Users/mirceapop/RiderProjects/Laborator_V2/Laborator_V2/Laborator_V2.csproj",
+      "libraryId": "Microsoft.Data.SqlClient.Internal.Logging",
+      "targetGraphs": [
+        "net8.0"
+      ]
+    }
+  ]
+}
