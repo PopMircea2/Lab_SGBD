@@ -1,9 +1,10 @@
 using Avalonia.Controls;
-using Microsoft.Data.Sqlite;
+using Microsoft.Data.SqlClient;
 using System;
 using System.Collections.Generic;
 using System.Data;
 using System.IO;
+using System.Linq;
 using System.Text.Json;
 
 namespace Laborator_V2;
@@ -13,9 +14,8 @@ public partial class MainWindow : Window
     private string _connStr = "";
     private string _parentTable = "";
     private string _childTable = "";
-    private string _initSqlPath = "";
 
-    // Variabile pentru stocarea metadatelor descoperite dinamic
+    // Key names loaded from appsettings.json.
     private string _parentPk = "";
     private string _childPk = "";
     private string _childFk = "";
@@ -24,6 +24,12 @@ public partial class MainWindow : Window
     private Dictionary<string, object?>? _selectedParentRow = null;
     private Dictionary<string, object?>? _selectedChildRow = null;
 
+    private const string PlaceholderRowKey = "__placeholder__";
+
+    // Guard flag: prevents ChildGrid_SelectionChanged from firing
+    // while columns are being rebuilt during ReloadChildData().
+    private bool _isLoadingChildData = false;
+
     // Dicționar pentru a păstra referințele către TextBox-urile generate dinamic
     private Dictionary<string, TextBox> _inputFields = new Dictionary<string, TextBox>();
 
@@ -31,146 +37,50 @@ public partial class MainWindow : Window
     {
         InitializeComponent();
         LoadConfig();
-        EnsureDatabase();
 
-        if (InitDatabaseMetadata())
-        {
-            LoadParentData();
-        }
+        LoadParentData();
     }
 
     private void LoadConfig()
     {
-        var config = JsonSerializer.Deserialize<Dictionary<string, string>>(File.ReadAllText("appsettings.json"));
-        var builder = new SqliteConnectionStringBuilder(config!["connectionString"]);
-        if (string.IsNullOrWhiteSpace(Path.GetDirectoryName(builder.DataSource)))
-            builder.DataSource = Path.Combine(AppContext.BaseDirectory, builder.DataSource);
+        var configPath = Path.Combine(AppContext.BaseDirectory, "appsettings.json");
+        if (!File.Exists(configPath))
+            configPath = "appsettings.json";
 
-        _connStr = builder.ToString();
-        _parentTable = config["parentTable"];
-        _childTable = config["childTable"];
-        _initSqlPath = Path.Combine(AppContext.BaseDirectory, "QueryTestDb.sql");
+        var config = JsonSerializer.Deserialize<Dictionary<string, string>>(File.ReadAllText(configPath))
+                     ?? new Dictionary<string, string>();
+
+        _connStr = config.GetValueOrDefault("connectionString", "");
+        _parentTable = config.GetValueOrDefault("parentTable", "");
+        _childTable = config.GetValueOrDefault("childTable", "");
+
+        // Keys are resolved dynamically from the database schema.
+        _parentPk = "";
+        _childPk = "";
+        _childFk = "";
     }
 
-    private void EnsureDatabase()
-    {
-        var dbPath = new SqliteConnectionStringBuilder(_connStr).DataSource;
 
-        using var conn = new SqliteConnection(_connStr);
-        conn.Open();
-        EnableForeignKeys(conn);
-
-        var hasTables = DatabaseHasTable(conn, _parentTable) && DatabaseHasTable(conn, _childTable);
-
-        if (!hasTables)
-        {
-            if (File.Exists(_initSqlPath))
-            {
-                var sql = File.ReadAllText(_initSqlPath);
-                foreach (var statement in SplitSqlStatements(sql))
-                {
-                    using var cmd = conn.CreateCommand();
-                    cmd.CommandText = statement;
-                    cmd.ExecuteNonQuery();
-                }
-            }
-            else
-            {
-                CreateSchemaAndSeed(conn);
-            }
-        }
-
-        EnsureSeedData(conn);
-    }
-
-    private static IEnumerable<string> SplitSqlStatements(string sql)
-    {
-        foreach (var part in sql.Split(';'))
-        {
-            var statement = part.Trim();
-            if (!string.IsNullOrEmpty(statement))
-                yield return statement;
-        }
-    }
-
-    private static void EnableForeignKeys(SqliteConnection conn)
-    {
-        using var cmd = conn.CreateCommand();
-        cmd.CommandText = "PRAGMA foreign_keys = ON;";
-        cmd.ExecuteNonQuery();
-    }
-
-    // DESCOPERIREA DINAMICĂ A STRUCTURII (Cerinta obligatorie pentru Nota 10)
-    private bool InitDatabaseMetadata()
-    {
-        try
-        {
-            using var conn = new SqliteConnection(_connStr);
-            conn.Open();
-            EnableForeignKeys(conn);
-
-            _parentPk = GetPrimaryKey(conn, _parentTable);
-            _childPk = GetPrimaryKey(conn, _childTable);
-            _childFk = GetForeignKey(conn, _childTable, _parentTable);
-
-            if (string.IsNullOrEmpty(_parentPk) || string.IsNullOrEmpty(_childPk) || string.IsNullOrEmpty(_childFk))
-            {
-                StatusText.Text = "❌ Relațiile 1:M nu au putut fi identificate automat în baza de date.";
-                return false;
-            }
-
-            StatusText.Text = $"✅ Structură detectată! Părinte PK: {_parentPk} | Copil PK: {_childPk} | FK Legătură: {_childFk}";
-            return true;
-        }
-        catch (Exception ex)
-        {
-            StatusText.Text = "❌ Eroare la citirea metadatelor: " + ex.Message;
-            return false;
-        }
-    }
-
-    private static string GetPrimaryKey(SqliteConnection conn, string table)
-    {
-        using var cmd = conn.CreateCommand();
-        cmd.CommandText = $"PRAGMA table_info([{table}]);";
-        using var reader = cmd.ExecuteReader();
-        while (reader.Read())
-        {
-            var isPk = Convert.ToInt32(reader["pk"]);
-            if (isPk == 1)
-                return reader["name"].ToString() ?? "";
-        }
-        return "";
-    }
-
-    private static string GetForeignKey(SqliteConnection conn, string childTable, string parentTable)
-    {
-        using var cmd = conn.CreateCommand();
-        cmd.CommandText = $"PRAGMA foreign_key_list([{childTable}]);";
-        using var reader = cmd.ExecuteReader();
-        while (reader.Read())
-        {
-            var refTable = reader["table"].ToString();
-            if (string.Equals(refTable, parentTable, StringComparison.OrdinalIgnoreCase))
-                return reader["from"].ToString() ?? "";
-        }
-        return "";
-    }
 
     private void LoadParentData()
     {
         try
         {
-            using var conn = new SqliteConnection(_connStr);
+            Console.WriteLine($"[DB] Connecting: {_connStr}");
+            using var conn = new SqlConnection(_connStr);
             conn.Open();
-            EnableForeignKeys(conn);
+            Console.WriteLine("[DB] Connected (parent load)");
 
-            using var cmd = conn.CreateCommand();
-            cmd.CommandText = $"SELECT * FROM {_parentTable}"; // Concatenarea permisă doar pentru numele tabelelor
+            ResolveKeys(conn);
 
-            using var reader = cmd.ExecuteReader();
             var parentTable = EnsureTable(_parentTable);
+            EnsureTableSchema(conn, parentTable, _parentTable);
+
+            Console.WriteLine($"[DB] Query parents: SELECT * FROM {_parentTable}");
+            using var cmd = new SqlCommand($"SELECT * FROM {_parentTable}", conn);
+            using var reader = cmd.ExecuteReader();
             parentTable.Load(reader);
+            Console.WriteLine($"[DB] Parents loaded: {parentTable.Rows.Count} rows");
 
             ConfigureGridColumns(ParentGrid, parentTable);
 
@@ -180,17 +90,8 @@ public partial class MainWindow : Window
         }
         catch (Exception ex)
         {
+            Console.WriteLine($"[DB] Parent load error: {ex}");
             StatusText.Text = "❌ Eroare la încărcarea părinților: " + ex.Message;
-        }
-    }
-
-    private void ParentGrid_SelectionChanged(object? sender, SelectionChangedEventArgs e)
-    {
-        if (ParentGrid.SelectedItem is Dictionary<string, object?> row)
-        {
-            _selectedParentRow = row;
-            _selectedChildRow = null;
-            ReloadChildData();
         }
     }
 
@@ -200,7 +101,6 @@ public partial class MainWindow : Window
         {
             var table = _dataSet.Tables[tableName];
             table.Clear();
-            table.Columns.Clear();
             return table;
         }
 
@@ -209,35 +109,100 @@ public partial class MainWindow : Window
         return newTable;
     }
 
-    private void ReloadChildData()
+    private void EnsureTableSchema(SqlConnection conn, DataTable table, string tableName)
+    {
+        if (table.Columns.Count > 0)
+            return;
+
+        Console.WriteLine($"[DB] Loading schema for {tableName}");
+        using var schemaCmd = new SqlCommand($"SELECT TOP 0 * FROM {tableName}", conn);
+        using var schemaReader = schemaCmd.ExecuteReader();
+        table.Load(schemaReader);
+    }
+
+    private async void ReloadChildData()
     {
         if (_selectedParentRow == null) return;
 
+        _isLoadingChildData = true;
+
+        // Snapshot values needed on the background thread before leaving the UI thread.
+        var parentPkValue = _selectedParentRow[_parentPk] ?? DBNull.Value;
+        var connStr = _connStr;
+        var parentTable = _parentTable;
+        var childTable = _childTable;
+
+        DataTable? childTableData = null;
+        string? errorMessage = null;
+
         try
         {
-            object parentPkValue = _selectedParentRow[_parentPk] ?? DBNull.Value;
+            // Run all blocking DB work on a background thread so the Avalonia UI
+            // dispatcher stays free. This prevents the race where Columns.Clear()
+            // and ItemsSource assignment interleave with pending layout passes.
+            childTableData = await System.Threading.Tasks.Task.Run(() =>
+            {
+                Console.WriteLine($"[DB] Connecting (background): {connStr}");
+                using var conn = new SqlConnection(connStr);
+                conn.Open();
 
-            using var conn = new SqliteConnection(_connStr);
-            conn.Open();
-            EnableForeignKeys(conn);
+                // ResolveKeys is safe to call here; it only reads _parentPk/_childPk/_childFk
+                // which are set once and never mutated concurrently.
+                ResolveKeys(conn);
+                if (string.IsNullOrEmpty(_parentPk) || string.IsNullOrEmpty(_childFk))
+                    throw new InvalidOperationException("Nu am putut determina PK/FK din DB.");
 
-            // Păstrăm parametrizarea strictă pentru valori interne
-            using var cmd = conn.CreateCommand();
-            cmd.CommandText = $"SELECT * FROM {_childTable} WHERE {_childFk} = @parentPkValue";
-            cmd.Parameters.AddWithValue("@parentPkValue", parentPkValue);
+                var dt = new DataTable(childTable);
 
-            using var reader = cmd.ExecuteReader();
-            var childTableData = EnsureTable(_childTable);
-            childTableData.Load(reader);
+                Console.WriteLine($"[DB] Query children WHERE {_childFk} = {parentPkValue}");
+                using var cmd = new SqlCommand(
+                    $"SELECT * FROM {childTable} WHERE {_childFk} = @pk", conn);
+                cmd.Parameters.AddWithValue("@pk", parentPkValue);
 
-            ConfigureGridColumns(ChildGrid, childTableData);
+                using var adapter = new SqlDataAdapter(cmd);
+                adapter.MissingSchemaAction = System.Data.MissingSchemaAction.AddWithKey;
+                adapter.Fill(dt);
+                Console.WriteLine($"[DB] Children loaded: {dt.Rows.Count} rows");
 
-            // După ce tabelul s-a încărcat, redesenăm formularul dinamic de jos
-            GenerateDynamicForm(childTableData);
+                // Safety net for 0-row results on some driver versions.
+                if (dt.Columns.Count == 0)
+                {
+                    using var schemaCmd = new SqlCommand($"SELECT TOP 0 * FROM {childTable}", conn);
+                    using var schemaAdapter = new SqlDataAdapter(schemaCmd);
+                    schemaAdapter.MissingSchemaAction = System.Data.MissingSchemaAction.AddWithKey;
+                    schemaAdapter.FillSchema(dt, System.Data.SchemaType.Source);
+                }
+
+                return dt;
+            });
         }
         catch (Exception ex)
         {
-            StatusText.Text = "❌ Eroare la încărcarea copiilor: " + ex.Message;
+            Console.WriteLine($"[DB] Child load error: {ex}");
+            errorMessage = ex.Message;
+        }
+
+        // Back on UI thread — update grid and form.
+        _isLoadingChildData = true; // keep guard up during UI rebuild
+        try
+        {
+            if (errorMessage != null)
+            {
+                StatusText.Text = "❌ Eroare la încărcarea copiilor: " + errorMessage;
+                return;
+            }
+
+            // Sync DataSet.
+            if (_dataSet.Tables.Contains(_childTable))
+                _dataSet.Tables.Remove(_childTable);
+            _dataSet.Tables.Add(childTableData!);
+
+            ConfigureGridColumns(ChildGrid, childTableData!);
+            GenerateDynamicForm(childTableData!);
+        }
+        finally
+        {
+            _isLoadingChildData = false;
         }
     }
 
@@ -274,12 +239,32 @@ public partial class MainWindow : Window
         }
     }
 
+    private void ParentGrid_SelectionChanged(object? sender, SelectionChangedEventArgs e)
+    {
+        if (ParentGrid.SelectedItem is Dictionary<string, object?> row)
+        {
+            if (IsPlaceholderRow(row))
+                return;
+
+            _selectedParentRow = row;
+            _selectedChildRow = null;
+            ReloadChildData();
+        }
+    }
+
     private void ChildGrid_SelectionChanged(object? sender, SelectionChangedEventArgs e)
     {
+        // Ignore selection-change events that Avalonia fires internally
+        // while we are rebuilding columns and ItemsSource.
+        if (_isLoadingChildData) return;
+
         if (ChildGrid.SelectedItem is Dictionary<string, object?> row)
         {
+            if (IsPlaceholderRow(row))
+                return;
+
             _selectedChildRow = row;
-            // Populăm textbox-urile cu datele rândului selectat pentru Update/Delete
+            // Populate inputs for update/delete.
             foreach (var kvp in _inputFields)
             {
                 kvp.Value.Text = row.TryGetValue(kvp.Key, out var value) ? value?.ToString() ?? "" : "";
@@ -290,17 +275,18 @@ public partial class MainWindow : Window
     // OPERAȚIA DE ADĂUGARE (INSERT)
     private void BtnInsert_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
-        if (_selectedParentRow == null)
+        if (string.IsNullOrEmpty(_childPk) || string.IsNullOrEmpty(_childFk))
         {
-            StatusText.Text = "⚠️ Selectați mai întâi un rând din tabelul părinte!";
+            StatusText.Text = "⚠️ Setează PK/FK în appsettings.json.";
             return;
         }
 
         try
         {
-            using var conn = new SqliteConnection(_connStr);
+            Console.WriteLine($"[DB] Connecting: {_connStr}");
+            using var conn = new SqlConnection(_connStr);
             conn.Open();
-            EnableForeignKeys(conn);
+            Console.WriteLine("[DB] Connected (insert)");
 
             var columns = new List<string>();
             var paramNames = new List<string>();
@@ -313,8 +299,8 @@ public partial class MainWindow : Window
             }
 
             string query = $"INSERT INTO {_childTable} ({string.Join(", ", columns)}) VALUES ({string.Join(", ", paramNames)})";
-            using var cmd = conn.CreateCommand();
-            cmd.CommandText = query;
+            Console.WriteLine($"[DB] Insert: {query}");
+            using var cmd = new SqlCommand(query, conn);
 
             foreach (var kvp in _inputFields)
             {
@@ -328,6 +314,7 @@ public partial class MainWindow : Window
         }
         catch (Exception ex)
         {
+            Console.WriteLine($"[DB] Insert error: {ex}");
             StatusText.Text = "❌ Eroare la adăugare: " + ex.Message;
         }
     }
@@ -335,17 +322,18 @@ public partial class MainWindow : Window
     // OPERAȚIA DE MODIFICARE (UPDATE)
     private void BtnUpdate_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
-        if (_selectedChildRow == null)
+        if (string.IsNullOrEmpty(_childPk) || string.IsNullOrEmpty(_childFk))
         {
-            StatusText.Text = "⚠️ Selectați înregistrarea din tabelul copil pe care vreți să o modificați!";
+            StatusText.Text = "⚠️ Setează PK/FK în appsettings.json.";
             return;
         }
 
         try
         {
-            using var conn = new SqliteConnection(_connStr);
+            Console.WriteLine($"[DB] Connecting: {_connStr}");
+            using var conn = new SqlConnection(_connStr);
             conn.Open();
-            EnableForeignKeys(conn);
+            Console.WriteLine("[DB] Connected (update)");
 
             var updateClauses = new List<string>();
             foreach (var kvp in _inputFields)
@@ -356,8 +344,8 @@ public partial class MainWindow : Window
             }
 
             string query = $"UPDATE {_childTable} SET {string.Join(", ", updateClauses)} WHERE {_childPk} = @childPkVal";
-            using var cmd = conn.CreateCommand();
-            cmd.CommandText = query;
+            Console.WriteLine($"[DB] Update: {query}");
+            using var cmd = new SqlCommand(query, conn);
 
             foreach (var kvp in _inputFields)
             {
@@ -372,6 +360,7 @@ public partial class MainWindow : Window
         }
         catch (Exception ex)
         {
+            Console.WriteLine($"[DB] Update error: {ex}");
             StatusText.Text = "❌ Eroare la modificare: " + ex.Message;
         }
     }
@@ -379,21 +368,22 @@ public partial class MainWindow : Window
     // OPERAȚIA DE ȘTERGERE (DELETE)
     private void BtnDelete_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
-        if (_selectedChildRow == null)
+        if (string.IsNullOrEmpty(_childPk))
         {
-            StatusText.Text = "⚠️ Selectați înregistrarea din tabelul copil pe care vreți să o ștergeți!";
+            StatusText.Text = "⚠️ Setează PK/FK în appsettings.json.";
             return;
         }
 
         try
         {
-            using var conn = new SqliteConnection(_connStr);
+            Console.WriteLine($"[DB] Connecting: {_connStr}");
+            using var conn = new SqlConnection(_connStr);
             conn.Open();
-            EnableForeignKeys(conn);
+            Console.WriteLine("[DB] Connected (delete)");
 
             string query = $"DELETE FROM {_childTable} WHERE {_childPk} = @childPkVal";
-            using var cmd = conn.CreateCommand();
-            cmd.CommandText = query;
+            Console.WriteLine($"[DB] Delete: {query}");
+            using var cmd = new SqlCommand(query, conn);
             cmd.Parameters.AddWithValue("@childPkVal", _selectedChildRow[_childPk] ?? DBNull.Value);
 
             cmd.ExecuteNonQuery();
@@ -403,26 +393,117 @@ public partial class MainWindow : Window
         }
         catch (Exception ex)
         {
+            Console.WriteLine($"[DB] Delete error: {ex}");
             StatusText.Text = "❌ Eroare la ștergere: " + ex.Message;
         }
     }
 
     private void ConfigureGridColumns(DataGrid grid, DataTable table)
     {
+        // Detach ItemsSource FIRST so Avalonia doesn't try to re-render
+        // while the column collection is in an inconsistent (empty) state.
+        // This is the root cause of columns disappearing after selection changes.
+        grid.ItemsSource = null;
         grid.AutoGenerateColumns = false;
         grid.Columns.Clear();
 
+        Console.WriteLine($"[DBG] Columns for {table.TableName}: {string.Join(", ", table.Columns.Cast<DataColumn>().Select(c => c.ColumnName))}");
+
         foreach (DataColumn col in table.Columns)
         {
+            // Use sanitized keys for binding to avoid parse issues with spaces/symbols.
+            var safeKey = SanitizeColumnKey(col.ColumnName);
             grid.Columns.Add(new DataGridTextColumn
             {
                 Header = col.ColumnName,
                 Width = new DataGridLength(1, DataGridLengthUnitType.Star),
-                Binding = new Avalonia.Data.Binding($"[{col.ColumnName}]")
+                Binding = new Avalonia.Data.Binding($"[{safeKey}]")
             });
         }
 
-        grid.ItemsSource = ToRowDictionaries(table);
+        var rows = ToRowDictionaries(table);
+        if (rows.Count == 0)
+            rows.Add(CreatePlaceholderRow(table));
+
+        // Reattach ItemsSource only after all columns are fully defined.
+        grid.ItemsSource = rows;
+    }
+
+    private void ResolveKeys(SqlConnection conn)
+    {
+        if (string.IsNullOrWhiteSpace(_parentTable) || string.IsNullOrWhiteSpace(_childTable))
+            return;
+
+        if (!string.IsNullOrWhiteSpace(_parentPk) &&
+            !string.IsNullOrWhiteSpace(_childPk) &&
+            !string.IsNullOrWhiteSpace(_childFk))
+            return;
+
+        _parentPk = FindPrimaryKey(conn, _parentTable) ?? "";
+        _childPk = FindPrimaryKey(conn, _childTable) ?? "";
+        _childFk = FindForeignKeyToParent(conn, _childTable, _parentTable) ?? "";
+
+        Console.WriteLine($"[DB] Keys: parentPk={_parentPk}, childPk={_childPk}, childFk={_childFk}");
+
+        if (string.IsNullOrWhiteSpace(_parentPk) || string.IsNullOrWhiteSpace(_childPk) || string.IsNullOrWhiteSpace(_childFk))
+            StatusText.Text = "⚠️ Nu am putut determina toate cheile din DB.";
+    }
+
+    private static (string Schema, string Name) ParseTableName(string tableName)
+    {
+        var cleaned = tableName.Replace("[", "").Replace("]", "").Trim();
+        var parts = cleaned.Split('.', 2, StringSplitOptions.RemoveEmptyEntries);
+        return parts.Length == 2 ? (parts[0], parts[1]) : ("dbo", cleaned);
+    }
+
+    private static string? FindPrimaryKey(SqlConnection conn, string tableName)
+    {
+        var (schema, name) = ParseTableName(tableName);
+        const string sql = @"
+SELECT ku.COLUMN_NAME
+FROM INFORMATION_SCHEMA.TABLE_CONSTRAINTS tc
+JOIN INFORMATION_SCHEMA.KEY_COLUMN_USAGE ku
+  ON tc.CONSTRAINT_NAME = ku.CONSTRAINT_NAME
+ AND tc.TABLE_SCHEMA = ku.TABLE_SCHEMA
+WHERE tc.CONSTRAINT_TYPE = 'PRIMARY KEY'
+  AND tc.TABLE_SCHEMA = @schema
+  AND tc.TABLE_NAME = @name
+ORDER BY ku.ORDINAL_POSITION;";
+
+        using var cmd = new SqlCommand(sql, conn);
+        cmd.Parameters.AddWithValue("@schema", schema);
+        cmd.Parameters.AddWithValue("@name", name);
+
+        using var reader = cmd.ExecuteReader();
+        return reader.Read() ? reader.GetString(0) : null;
+    }
+
+    private static string? FindForeignKeyToParent(SqlConnection conn, string childTable, string parentTable)
+    {
+        var (childSchema, childName) = ParseTableName(childTable);
+        var (parentSchema, parentName) = ParseTableName(parentTable);
+
+        const string sql = @"
+SELECT c_child.name
+FROM sys.foreign_keys fk
+JOIN sys.foreign_key_columns fkc ON fk.object_id = fkc.constraint_object_id
+JOIN sys.tables t_parent ON fkc.referenced_object_id = t_parent.object_id
+JOIN sys.schemas s_parent ON t_parent.schema_id = s_parent.schema_id
+JOIN sys.tables t_child ON fkc.parent_object_id = t_child.object_id
+JOIN sys.schemas s_child ON t_child.schema_id = s_child.schema_id
+JOIN sys.columns c_child ON fkc.parent_object_id = c_child.object_id AND fkc.parent_column_id = c_child.column_id
+WHERE s_parent.name = @parentSchema AND t_parent.name = @parentName
+  AND s_child.name = @childSchema AND t_child.name = @childName
+ORDER BY fkc.constraint_column_id;";
+
+        using var cmd = new SqlCommand(sql, conn);
+        cmd.Parameters.AddWithValue("@parentSchema", parentSchema);
+        cmd.Parameters.AddWithValue("@parentName", parentName);
+        cmd.Parameters.AddWithValue("@childSchema", childSchema);
+        cmd.Parameters.AddWithValue("@childName", childName);
+
+        using var reader = cmd.ExecuteReader();
+        return reader.Read() ? reader.GetString(0) : null;
     }
 
     private static List<Dictionary<string, object?>> ToRowDictionaries(DataTable table)
@@ -434,55 +515,55 @@ public partial class MainWindow : Window
             foreach (DataColumn col in table.Columns)
             {
                 var value = row[col];
-                dict[col.ColumnName] = value == DBNull.Value ? null : value;
+                var normalizedValue = value == DBNull.Value ? null : value;
+                dict[col.ColumnName] = normalizedValue;
+
+                var safeKey = SanitizeColumnKey(col.ColumnName);
+                if (!string.Equals(safeKey, col.ColumnName, StringComparison.Ordinal))
+                    dict[safeKey] = normalizedValue;
             }
             rows.Add(dict);
         }
         return rows;
     }
 
-    private static bool DatabaseHasTable(SqliteConnection conn, string tableName)
+    private static Dictionary<string, object?> CreatePlaceholderRow(DataTable table)
     {
-        using var cmd = conn.CreateCommand();
-        cmd.CommandText = "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = @name;";
-        cmd.Parameters.AddWithValue("@name", tableName);
-        return cmd.ExecuteScalar() != null;
-    }
-
-    private static void CreateSchemaAndSeed(SqliteConnection conn)
-    {
-        using (var cmd = conn.CreateCommand())
+        var dict = new Dictionary<string, object?>
         {
-            cmd.CommandText = @"
-CREATE TABLE IF NOT EXISTS Parents (
-    ParentId INTEGER PRIMARY KEY,
-    Name TEXT NOT NULL
-);
+            [PlaceholderRowKey] = true
+        };
 
-CREATE TABLE IF NOT EXISTS Children (
-    ChildId INTEGER PRIMARY KEY,
-    ParentId INTEGER NOT NULL,
-    Name TEXT NOT NULL,
-    FOREIGN KEY (ParentId) REFERENCES Parents(ParentId)
-);";
-            cmd.ExecuteNonQuery();
+        foreach (DataColumn col in table.Columns)
+        {
+            dict[col.ColumnName] = null;
+
+            var safeKey = SanitizeColumnKey(col.ColumnName);
+            if (!string.Equals(safeKey, col.ColumnName, StringComparison.Ordinal))
+                dict[safeKey] = null;
         }
 
-        EnsureSeedData(conn);
+        return dict;
     }
 
-    private static void EnsureSeedData(SqliteConnection conn)
+    private static bool IsPlaceholderRow(Dictionary<string, object?> row)
     {
-        if (!DatabaseHasTable(conn, "Parents") || !DatabaseHasTable(conn, "Children"))
-            return;
+        return row.TryGetValue(PlaceholderRowKey, out var value) && value is true;
+    }
 
-        using var cmd = conn.CreateCommand();
-        cmd.CommandText = @"
-INSERT OR IGNORE INTO Parents (ParentId, Name) VALUES (1, 'Parent 1');
-INSERT OR IGNORE INTO Parents (ParentId, Name) VALUES (2, 'Parent 2');
+    private static string SanitizeColumnKey(string name)
+    {
+        if (string.IsNullOrWhiteSpace(name))
+            return "_";
 
-INSERT OR IGNORE INTO Children (ChildId, ParentId, Name) VALUES (1, 1, 'Child A');
-INSERT OR IGNORE INTO Children (ChildId, ParentId, Name) VALUES (2, 1, 'Child B');";
-        cmd.ExecuteNonQuery();
+        var chars = name.ToCharArray();
+        for (var i = 0; i < chars.Length; i++)
+        {
+            var c = chars[i];
+            if (!char.IsLetterOrDigit(c) && c != '_')
+                chars[i] = '_';
+        }
+
+        return new string(chars);
     }
 }
