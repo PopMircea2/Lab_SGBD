@@ -24,6 +24,8 @@ public partial class MainWindow : Window
     private Dictionary<string, object?>? _selectedParentRow = null;
     private Dictionary<string, object?>? _selectedChildRow = null;
 
+    private Dictionary<string, TextBox> _inputFields = new();
+
 
     public MainWindow()
     {
@@ -31,6 +33,7 @@ public partial class MainWindow : Window
         LoadConfig();
         LoadParentData();
     }
+
 
 
     private void LoadConfig()
@@ -45,7 +48,6 @@ public partial class MainWindow : Window
         _parentTable = config.GetValueOrDefault("parentTable", "");
         _childTable  = config.GetValueOrDefault("childTable", "");
     }
-
     
 
     private void ResolveKeys(SqlConnection conn)
@@ -62,7 +64,7 @@ public partial class MainWindow : Window
         if (string.IsNullOrWhiteSpace(_parentPk) ||
             string.IsNullOrWhiteSpace(_childPk)  ||
             string.IsNullOrWhiteSpace(_childFk))
-            StatusText.Text = " Nu am putut determina toate cheile din DB.";
+            StatusText.Text = "Nu am putut determina toate cheile din DB.";
     }
 
     private static (string Schema, string Name) ParseTableName(string tableName)
@@ -120,7 +122,7 @@ ORDER BY fkc.constraint_column_id;";
         return reader.Read() ? reader.GetString(0) : null;
     }
 
-   
+
     private static void BuildColumns(DataGrid grid, DataTable table)
     {
         grid.ItemsSource = null;
@@ -138,6 +140,7 @@ ORDER BY fkc.constraint_column_id;";
         }
     }
     
+    
     private static void SetRows(DataGrid grid, DataTable table)
     {
         var rows = new List<Dictionary<string, object?>>();
@@ -151,6 +154,7 @@ ORDER BY fkc.constraint_column_id;";
         grid.ItemsSource = rows;
     }
 
+    // ── Data loading ──────────────────────────────────────────────────────────
 
     private void LoadParentData()
     {
@@ -198,6 +202,7 @@ ORDER BY fkc.constraint_column_id;";
             adapter.MissingSchemaAction = MissingSchemaAction.AddWithKey;
             adapter.Fill(_childData);
 
+            // If no rows came back, pull schema separately so columns are still visible.
             if (_childData.Columns.Count == 0)
             {
                 using var schemaAdapter = new SqlDataAdapter(
@@ -208,6 +213,7 @@ ORDER BY fkc.constraint_column_id;";
 
             BuildColumns(ChildGrid, _childData);
             SetRows(ChildGrid, _childData);
+            GenerateDynamicForm(_childData);
 
         }
         catch (Exception ex)
@@ -216,6 +222,7 @@ ORDER BY fkc.constraint_column_id;";
         }
     }
 
+    // ── Selection handlers ────────────────────────────────────────────────────
 
     private void ParentGrid_SelectionChanged(object? sender, SelectionChangedEventArgs e)
     {
@@ -232,7 +239,166 @@ ORDER BY fkc.constraint_column_id;";
         if (ChildGrid.SelectedItem is Dictionary<string, object?> row)
         {
             _selectedChildRow = row;
+            // Populate form fields with selected row values
+            foreach (var kvp in _inputFields)
+            {
+                var val = row.TryGetValue(kvp.Key, out var v) ? v?.ToString() ?? "" : "";
+                kvp.Value.Text = val;
+            }
         }
     }
 
+    // ── Delete ────────────────────────────────────────────────────────────────
+
+    public void BtnDelete_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        if (_selectedChildRow == null)
+        {
+            StatusText.Text = "Selectează un rând din tabelul copil.";
+            return;
+        }
+
+        try
+        {
+            using var conn = new SqlConnection(_connStr);
+            conn.Open();
+
+            using var cmd = new SqlCommand(
+                $"DELETE FROM {_childTable} WHERE {_childPk} = @pk", conn);
+            cmd.Parameters.AddWithValue("@pk", _selectedChildRow[_childPk] ?? DBNull.Value);
+
+            cmd.ExecuteNonQuery();
+            StatusText.Text = "Rând șters cu succes.";
+            _selectedChildRow = null;
+            ReloadChildData();
+        }
+        catch (Exception ex)
+        {
+            StatusText.Text = "Eroare la ștergere: " + ex.Message;
+        }
+    }
+
+    // ── Dynamic form ──────────────────────────────────────────────────────────
+
+    private void GenerateDynamicForm(DataTable schema)
+    {
+        DynamicFormPanel.Children.Clear();
+        _inputFields.Clear();
+
+        foreach (DataColumn col in schema.Columns)
+        {
+            var panel = new StackPanel { Margin = new Avalonia.Thickness(5), Width = 180 };
+
+            panel.Children.Add(new TextBlock
+            {
+                Text       = col.ColumnName,
+                FontWeight = Avalonia.Media.FontWeight.Medium,
+                Margin     = new Avalonia.Thickness(0, 0, 0, 3)
+            });
+
+            var textBox = new TextBox();
+
+            if (col.ColumnName == _childFk && _selectedParentRow != null)
+            {
+                textBox.Text      = _selectedParentRow[_parentPk]?.ToString();
+                textBox.IsReadOnly = true;
+            }
+
+            panel.Children.Add(textBox);
+            DynamicFormPanel.Children.Add(panel);
+            _inputFields[col.ColumnName] = textBox;
+        }
+    }
+
+    // ── Insert ────────────────────────────────────────────────────────────────
+
+    public void BtnInsert_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        if (_selectedParentRow == null)
+        {
+            StatusText.Text = "Selectează un rând din tabelul părinte.";
+            return;
+        }
+
+        try
+        {
+            using var conn = new SqlConnection(_connStr);
+            conn.Open();
+
+            var columns    = new List<string>();
+            var paramNames = new List<string>();
+
+            foreach (var kvp in _inputFields)
+            {
+                columns.Add(kvp.Key);
+                paramNames.Add("@" + kvp.Key);
+            }
+
+            var query = $"INSERT INTO {_childTable} ({string.Join(", ", columns)}) " +
+                        $"VALUES ({string.Join(", ", paramNames)})";
+
+            using var cmd = new SqlCommand(query, conn);
+            foreach (var kvp in _inputFields)
+            {
+                cmd.Parameters.AddWithValue("@" + kvp.Key,
+                    string.IsNullOrWhiteSpace(kvp.Value.Text)
+                        ? DBNull.Value
+                        : (object)kvp.Value.Text);
+            }
+
+            cmd.ExecuteNonQuery();
+            StatusText.Text = "Rând adăugat cu succes.";
+            ReloadChildData();
+        }
+        catch (Exception ex)
+        {
+            StatusText.Text = "Eroare la adăugare: " + ex.Message;
+        }
+    }
+
+    // ── Update ────────────────────────────────────────────────────────────────
+
+    public void BtnUpdate_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        if (_selectedChildRow == null)
+        {
+            StatusText.Text = "Selectează un rând din tabelul copil.";
+            return;
+        }
+
+        try
+        {
+            using var conn = new SqlConnection(_connStr);
+            conn.Open();
+
+            var setClauses = new List<string>();
+            foreach (var kvp in _inputFields)
+            {
+                if (kvp.Key == _childPk || kvp.Key == _childFk) continue;
+                setClauses.Add($"{kvp.Key} = @{kvp.Key}");
+            }
+
+            var query = $"UPDATE {_childTable} SET {string.Join(", ", setClauses)} " +
+                        $"WHERE {_childPk} = @pk";
+
+            using var cmd = new SqlCommand(query, conn);
+            foreach (var kvp in _inputFields)
+            {
+                if (kvp.Key == _childPk || kvp.Key == _childFk) continue;
+                cmd.Parameters.AddWithValue("@" + kvp.Key,
+                    string.IsNullOrWhiteSpace(kvp.Value.Text)
+                        ? DBNull.Value
+                        : (object)kvp.Value.Text);
+            }
+            cmd.Parameters.AddWithValue("@pk", _selectedChildRow[_childPk] ?? DBNull.Value);
+
+            cmd.ExecuteNonQuery();
+            StatusText.Text = "Rând modificat cu succes.";
+            ReloadChildData();
+        }
+        catch (Exception ex)
+        {
+            StatusText.Text = "Eroare la modificare: " + ex.Message;
+        }
+    }
 }
